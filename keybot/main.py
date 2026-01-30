@@ -1,9 +1,12 @@
 import os
+import asyncio
 import random
 import string
-import asyncio
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+from threading import Thread
+from flask import Flask
+
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -12,13 +15,11 @@ from telegram import (
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
-    ContextTypes,
-    CallbackQueryHandler
+    CallbackQueryHandler,
+    ContextTypes
 )
-from threading import Thread
-from flask import Flask
 
-# ===== KEEP ALIVE =====
+# ===== KEEP ALIVE (RENDER) =====
 app_web = Flask(__name__)
 
 @app_web.route("/")
@@ -34,152 +35,230 @@ def keep_alive():
 
 # ===== CONFIG =====
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
-OWNER_ID = 123456789  # 🔥 PALITAN MO
+OWNER_ID = int(os.environ.get("OWNER_ID", "0"))
 PH_TZ = ZoneInfo("Asia/Manila")
 
-# ===== STORAGE =====
-keys_db = {}
+# ===== DATABASES (IN-MEMORY) =====
+access_keys = {}      # access_key -> expire
+user_access = {}      # user_id -> expire
+random_keys = {}      # key -> expire
 
-# ===== KEY GENERATOR =====
-def generate_key(length=12):
-    return "Kaze-" + ''.join(
-        random.choice(string.ascii_letters + string.digits)
-        for _ in range(length)
-    )
+# ===== UTILS =====
+def generate_key(length=10):
+    chars = string.ascii_letters + string.digits
+    return "Kaze-" + ''.join(random.choice(chars) for _ in range(length))
 
-# ===== TIME PARSER =====
-def parse_duration(text):
-    try:
-        v = int(text[:-1])
-        u = text[-1].lower()
-        if u == "m": return timedelta(minutes=v)
-        if u == "h": return timedelta(hours=v)
-        if u == "d": return timedelta(days=v)
-    except:
-        pass
+def duration_from_code(code):
+    if code == "1m":
+        return timedelta(minutes=1)
+    if code == "1h":
+        return timedelta(hours=1)
+    if code == "1d":
+        return timedelta(days=1)
     return None
 
-# ===== INLINE KEYBOARD =====
-def start_keyboard():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔐 Generate ACCESS Key", callback_data="access_menu")],
-        [InlineKeyboardButton("🔑 Generate RANDOM Key", callback_data="random_key")],
-        [InlineKeyboardButton("🗑 Revoke ACCESS Key", callback_data="revoke_info")]
-    ])
-
-def access_keyboard():
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("1 Minute", callback_data="access_1m"),
-            InlineKeyboardButton("1 Hour", callback_data="access_1h")
-        ],
-        [InlineKeyboardButton("1 Day", callback_data="access_1d")]
-    ])
-
-# ===== AUTO EXPIRE =====
-async def expire_key_after(duration, key, chat_id, app):
+# ===== AUTO EXPIRE RANDOM KEY =====
+async def expire_random_key(duration, key, chat_id, app):
     await asyncio.sleep(duration.total_seconds())
-    if key in keys_db:
-        del keys_db[key]
+    if key in random_keys:
+        del random_keys[key]
         await app.bot.send_message(
             chat_id,
-            f"❌ ACCESS KEY EXPIRED\n\n📝 `{key}`",
+            f"❌ 𝗞𝗘𝗬 𝗘𝗫𝗣𝗜𝗥𝗘𝗗\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"🔑 `{key}`\n"
+            f"🔴 Status: EXPIRED",
             parse_mode="Markdown"
         )
 
-# ===== /start =====
+# ===== /START =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_ID:
-        await update.message.reply_text("❌ Owner only panel")
-        return
+    user_id = update.effective_user.id
+    now = datetime.now(PH_TZ)
 
-    await update.message.reply_text(
-        "⚙️ OWNER CONTROL PANEL",
-        reply_markup=start_keyboard()
-    )
+    if user_id in user_access and user_access[user_id] > now:
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔑 Generate Random Key", callback_data="gen_random")]
+        ])
+        await update.message.reply_text(
+            "✅ ACCESS GRANTED\n\nChoose an option:",
+            reply_markup=keyboard
+        )
+    else:
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔐 Enter Access Key", callback_data="enter_access")]
+        ])
+        await update.message.reply_text(
+            "🚫 ACCESS REQUIRED\n\nYou need a valid access key.",
+            reply_markup=keyboard
+        )
 
 # ===== INLINE HANDLER =====
-async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
+async def inline_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    now = datetime.now(PH_TZ)
 
-    if q.from_user.id != OWNER_ID:
-        await q.message.reply_text("❌ Owner only")
-        return
-
-    if q.data == "access_menu":
-        await q.message.reply_text(
-            "Select ACCESS KEY duration:",
-            reply_markup=access_keyboard()
+    if query.data == "enter_access":
+        await query.message.reply_text(
+            "🔑 Send your access key using:\n\n`/access YOUR_KEY`",
+            parse_mode="Markdown"
         )
-        return
 
-    if q.data.startswith("access_"):
-        duration = parse_duration(q.data.replace("access_", ""))
+    elif query.data == "gen_random":
+        if user_id not in user_access or user_access[user_id] < now:
+            await query.message.reply_text("❌ Access required.")
+            return
+
+        keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("⏱ 1m", callback_data="rk_1m"),
+                InlineKeyboardButton("⏱ 1h", callback_data="rk_1h"),
+                InlineKeyboardButton("⏱ 1d", callback_data="rk_1d"),
+            ]
+        ])
+        await query.message.reply_text(
+            "⏳ Select duration:",
+            reply_markup=keyboard
+        )
+
+    elif query.data.startswith("rk_"):
+        if user_id not in user_access or user_access[user_id] < now:
+            return
+
+        code = query.data.replace("rk_", "")
+        duration = duration_from_code(code)
+
         key = generate_key()
         expire = datetime.now(PH_TZ) + duration
-        keys_db[key] = expire
+        random_keys[key] = expire
 
-        await q.message.reply_text(
-            f"🔐 ACCESS KEY GENERATED\n\n"
-            f"🔑 `{key}`\n"
-            f"📅 Expires:\n{expire.strftime('%B %d, %Y • %I:%M %p')}",
+        await query.message.reply_text(
+            "✨ 𝗞𝗘𝗬 𝗚𝗘𝗡𝗘𝗥𝗔𝗧𝗘𝗗\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"🔑 `{key}`\n\n"
+            f"📅 Expires (PH):\n"
+            f"{expire.strftime('%B %d, %Y • %I:%M %p')}\n\n"
+            "🟢 Status: ACTIVE",
             parse_mode="Markdown"
         )
 
         asyncio.create_task(
-            expire_key_after(duration, key, q.message.chat_id, context.application)
-        )
-        return
-
-    if q.data == "random_key":
-        key = generate_key()
-        await q.message.reply_text(
-            f"🔑 RANDOM KEY:\n`{key}`\n\n⚠️ Not valid for access",
-            parse_mode="Markdown"
-        )
-        return
-
-    if q.data == "revoke_info":
-        await q.message.reply_text(
-            "🗑 Revoke access key using:\n/revoke YOUR_KEY",
-            parse_mode="Markdown"
+            expire_random_key(
+                duration,
+                key,
+                query.message.chat.id,
+                context.application
+            )
         )
 
-# ===== /genkey (COMMAND STILL WORKS) =====
-async def genkey(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    key = generate_key()
-    await update.message.reply_text(f"🔑 Random Key:\n`{key}`", parse_mode="Markdown")
-
-# ===== /revoke =====
-async def revoke(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_ID:
-        await update.message.reply_text("❌ Owner only")
-        return
+# ===== /ACCESS =====
+async def access(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    now = datetime.now(PH_TZ)
 
     if not context.args:
-        await update.message.reply_text("Usage: /revoke KEY")
+        await update.message.reply_text("Usage: /access YOUR_KEY")
         return
 
     key = context.args[0]
-    if key in keys_db:
-        del keys_db[key]
-        await update.message.reply_text("🗑 Access key revoked")
+    expire = access_keys.get(key)
+
+    if not expire or expire < now:
+        await update.message.reply_text("❌ Invalid or expired access key")
+        return
+
+    user_access[user_id] = expire
+    await update.message.reply_text("✅ Access granted! Use /start")
+
+# ===== /GENKEY =====
+async def genkey(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+
+    if not context.args:
+        await update.message.reply_text(
+            "Usage:\n"
+            "/genkey 1m | 1h | 1d\n"
+            "/genkey access 1d (owner only)"
+        )
+        return
+
+    # ===== ACCESS KEY (OWNER ONLY) =====
+    if context.args[0].lower() == "access":
+        if user_id != OWNER_ID:
+            await update.message.reply_text("❌ Owner only panel")
+            return
+
+        duration = duration_from_code(context.args[1])
+        key = generate_key()
+        expire = datetime.now(PH_TZ) + duration
+        access_keys[key] = expire
+
+        await update.message.reply_text(
+            "🔐 ACCESS KEY GENERATED\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            f"🔑 `{key}`\n"
+            f"📅 Expires (PH):\n"
+            f"{expire.strftime('%B %d, %Y • %I:%M %p')}",
+            parse_mode="Markdown"
+        )
+        return
+
+    # ===== RANDOM KEY (USERS) =====
+    if user_id not in user_access or user_access[user_id] < datetime.now(PH_TZ):
+        await update.message.reply_text("❌ You need access first. Use /start")
+        return
+
+    duration = duration_from_code(context.args[0])
+    key = generate_key()
+    expire = datetime.now(PH_TZ) + duration
+    random_keys[key] = expire
+
+    await update.message.reply_text(
+        "✨ 𝗞𝗘𝗬 𝗚𝗘𝗡𝗘𝗥𝗔𝗧𝗘𝗗\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"🔑 `{key}`\n"
+        f"📅 Expires:\n"
+        f"{expire.strftime('%B %d, %Y • %I:%M %p')}",
+        parse_mode="Markdown"
+    )
+
+    asyncio.create_task(
+        expire_random_key(
+            duration,
+            key,
+            update.effective_chat.id,
+            context.application
+        )
+    )
+
+# ===== /REVOKE =====
+async def revoke(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        return
+
+    key = context.args[0]
+    if key in access_keys:
+        del access_keys[key]
+        await update.message.reply_text("✅ Access key revoked")
     else:
         await update.message.reply_text("❌ Key not found")
 
 # ===== MAIN =====
 def main():
+    keep_alive()
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("access", access))
     app.add_handler(CommandHandler("genkey", genkey))
     app.add_handler(CommandHandler("revoke", revoke))
-    app.add_handler(CallbackQueryHandler(buttons))
+    app.add_handler(CallbackQueryHandler(inline_handler))
 
-    print("🤖 Bot running...")
+    print("🤖 Bot running (Polling + Flask)")
     app.run_polling()
 
 if __name__ == "__main__":
-    keep_alive()
+    keep_alive()  # optional
     main()
