@@ -98,7 +98,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🔑 Generate Random Key", callback_data="gen_random")]
         ])
         await update.message.reply_text(
-            "\n\nChoose an option:",
+            "✅ ACCESS GRANTED\n\nChoose an option:",
             reply_markup=keyboard
         )
     else:
@@ -156,10 +156,8 @@ async def inline_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "━━━━━━━━━━━━━━━━━━━━\n"
             f"🔑 `{key}`\n\n"
             f"📅 Expires (PH):\n"
-            f"{expire.strftime('%B %d, %Y • %I:%M %p')}"
+            f"{expire.strftime('%B %d, %Y • %I:%M %p')}\n\n"
             "🟢 Status: ACTIVE",
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "🔥 Auto notify when key expires",
             parse_mode="Markdown"
         )
 
