@@ -5,12 +5,11 @@ from fastapi import FastAPI, Request
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-BOT_TOKEN = os.environ["BOT_TOKEN"]
-WEBHOOK_URL = os.environ["WEBHOOK_URL"]
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
 
 app = FastAPI()
 
-# Telegram app
 telegram_app = ApplicationBuilder().token(BOT_TOKEN).build()
 
 def generate_key(length=12):
@@ -25,11 +24,11 @@ async def genkey(update: Update, context: ContextTypes.DEFAULT_TYPE):
 telegram_app.add_handler(CommandHandler("genkey", genkey))
 
 @app.on_event("startup")
-async def on_startup():
+async def startup():
     await telegram_app.bot.set_webhook(WEBHOOK_URL)
 
 @app.post("/webhook")
-async def telegram_webhook(request: Request):
+async def webhook(request: Request):
     data = await request.json()
     update = Update.de_json(data, telegram_app.bot)
     await telegram_app.update_queue.put(update)
