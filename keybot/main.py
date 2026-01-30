@@ -152,15 +152,15 @@ async def inline_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         random_keys[key] = expire
 
         await query.message.reply_text(
-            "✨ 𝗞𝗘𝗬 𝗚𝗘𝗡𝗘𝗥𝗔𝗧𝗘𝗗\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            f"🔑 `{key}`\n\n"
-            f"📅 Expires (PH):\n"
-            f"{expire.strftime('%B %d, %Y • %I:%M %p')}\n\n"
-            "🟢 Status: ACTIVE",
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "🔥 Auto notify when key expires",
-            parse_mode="Markdown"
+          "✨ 𝗞𝗘𝗬 𝗚𝗘𝗡𝗘𝗥𝗔𝗧𝗘𝗗\n"
+          "━━━━━━━━━━━━━━━━━━━━\n"
+          f"🔑 `{key}`\n\n"
+          f"📅 Expires (PH):\n"
+          f"{expire.strftime('%B %d, %Y • %I:%M %p')}\n\n"
+          "🟢 Status: ACTIVE",
+          "━━━━━━━━━━━━━━━━━━━━\n"
+          "🔥 Auto notify when key expires",
+          parse_mode="Markdown"
         )
 
         asyncio.create_task(
