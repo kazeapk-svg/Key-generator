@@ -151,18 +151,16 @@ async def inline_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         expire = datetime.now(PH_TZ) + duration
         random_keys[key] = expire
 
-        await update.message.reply_text(
-        "✨ 𝗞𝗘𝗬 𝗚𝗘𝗡𝗘𝗥𝗔𝗧𝗘𝗗\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "💎 𝗞𝗘𝗬 𝗜𝗡𝗙𝗢𝗥𝗠𝗔𝗧𝗜𝗢𝗡\n\n"
-        f"🔑 𝗞𝗲𝘆:\n`{key}` (tap to copy)\n\n"
-        "📅 𝗘𝘅𝗽𝗶𝗿𝗲𝘀 (PH):\n"
-        f"{expire.strftime('%B %d, %Y • %I:%M %p')}"
-        "📌 𝗦𝘁𝗮𝘁𝘂𝘀:\n"
-        "🟢 ACTIVE\n\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "🔥 Auto notify when key expires",
-        parse_mode="Markdown"
+        await query.message.reply_text(
+            "✨ 𝗞𝗘𝗬 𝗚𝗘𝗡𝗘𝗥𝗔𝗧𝗘𝗗\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"🔑 `{key}`\n\n"
+            f"📅 Expires (PH):\n"
+            f"{expire.strftime('%B %d, %Y • %I:%M %p')}"
+            "🟢 Status: ACTIVE",
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🔥 Auto notify when key expires",
+            parse_mode="Markdown"
         )
 
         asyncio.create_task(
@@ -297,11 +295,10 @@ async def genkey(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✨ 𝗞𝗘𝗬 𝗚𝗘𝗡𝗘𝗥𝗔𝗧𝗘𝗗\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "💎 𝗞𝗘𝗬 𝗜𝗡𝗙𝗢𝗥𝗠𝗔𝗧𝗜𝗢𝗡\n\n"
-        f"🔑 𝗞𝗲𝘆:\n`{key}` (tap to copy)\n\n"
-        "📅 𝗘𝘅𝗽𝗶𝗿𝗲𝘀 (PH):\n"
+        f"🔑 𝗞𝗲𝘆:\n`{key}` (tap to copy)"
+        "📅 𝗘𝘅𝗽𝗶𝗿𝗲𝘀 (PH):"
         f"{expire.strftime('%B %d, %Y • %I:%M %p')}"
-        "📌 𝗦𝘁𝗮𝘁𝘂𝘀:\n"
-        "🟢 ACTIVE\n\n"
+        "📌 𝗦𝘁𝗮𝘁𝘂𝘀: ACTIVE"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "🔥 Auto notify when key expires",
         parse_mode="Markdown"
