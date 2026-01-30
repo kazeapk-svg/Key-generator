@@ -184,71 +184,74 @@ async def access(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ===== /GENKEY =====
 async def genkey(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    now = datetime.now(PH_TZ)
 
     if not context.args:
         await update.message.reply_text(
             "Usage:\n"
-            "/genkey 1m | 1h | 1d\n"
-            "/genkey 3d | 7d | Lifetime"
-            "🔥Auto notify if key expired🔥"
+            "/genkey access 1d | 3d | 7d | lifetime\n"
+            "/genkey 1m | 1h | 1d"
         )
         return
 
-    # ===== ACCESS KEY (OWNER ONLY) =====
+    # ===== OWNER: ACCESS KEY =====
     if context.args[0].lower() == "access":
-    if user_id != OWNER_ID:
-    await update.message.reply_text("❌ Owner only panel")
-    return
-    
-    if len(context.args) < 2:
+        if user_id != OWNER_ID:
+            await update.message.reply_text("❌ Owner only panel")
+            return
+
+        if len(context.args) < 2:
+            await update.message.reply_text(
+                "Example:\n"
+                "/genkey access 1d\n"
+                "/genkey access 3d\n"
+                "/genkey access 7d\n"
+                "/genkey access lifetime"
+            )
+            return
+
+        duration_code = context.args[1].lower()
+        duration = duration_from_code(duration_code)
+
+        if duration is None and duration_code != "lifetime":
+            await update.message.reply_text("❌ Invalid duration")
+            return
+
+        key = generate_key()
+
+        if duration:
+            expire = now + duration
+        else:
+            expire = None  # lifetime
+
+        access_keys[key] = expire
+
         await update.message.reply_text(
-            "❌ Missing duration\n\n"
-            "Example:\n"
-            "/genkey access 1d\n"
-            "/genkey access 3d\n"
-            "/genkey access 7d\n"
-            "/genkey access lifetime"
+            "🔐 ACCESS KEY GENERATED\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            f"🔑 `{key}`\n"
+            f"📅 Expires (PH):\n"
+            f"{expire.strftime('%B %d, %Y • %I:%M %p') if expire else '♾ LIFETIME'}",
+            parse_mode="Markdown"
         )
         return
 
-    duration = duration_from_code(context.args[1])
-
-    if duration is None and context.args[1].lower() != "lifetime":
-        await update.message.reply_text("❌ Invalid duration")
-        return
-
-    key = generate_key()
-    now = datetime.now(PH_TZ)
-
-    if duration:
-        expire = now + duration
-    else:
-        expire = None  # ♾ lifetime
-
-    access_keys[key] = expire
-
-    await update.message.reply_text(
-        "🔐 ACCESS KEY GENERATED\n"
-        "━━━━━━━━━━━━━━━━━━━\n"
-        f"🔑 `{key}`\n"
-        f"📅 Expires (PH):\n"
-        f"{expire.strftime('%B %d, %Y • %I:%M %p') if expire else '♾ LIFETIME'}",
-        parse_mode="Markdown"
-    )
-    return
-    
-    # ===== RANDOM KEY (USERS) =====
-    if user_id not in user_access or user_access[user_id] < datetime.now(PH_TZ):
+    # ===== USER: RANDOM KEY =====
+    if user_id not in user_access or user_access[user_id] < now:
         await update.message.reply_text("❌ You need access first. Use /start")
         return
 
     duration = duration_from_code(context.args[0])
+    if not duration:
+        await update.message.reply_text("❌ Invalid duration")
+        return
+
     key = generate_key()
-    expire = datetime.now(PH_TZ) + duration
+    expire = now + duration
     random_keys[key] = expire
 
     await update.message.reply_text(
-        "✨ 𝗞𝗘𝗬 𝗚𝗘𝗡𝗘𝗥𝗔𝗧𝗘𝗗\n"
+        "✨ RANDOM KEY GENERATED\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         f"🔑 `{key}`\n"
         f"📅 Expires:\n"
@@ -264,7 +267,6 @@ async def genkey(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.application
         )
     )
-
 # ===== /REVOKE =====
 async def revoke(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID:
