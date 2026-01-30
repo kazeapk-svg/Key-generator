@@ -45,7 +45,7 @@ user_access_key = {}    # user_id -> access_key
 random_keys = {}        # random_key -> expire
 
 # ===== UTILS =====
-def generate_key(length=10):
+def generate_key(length=7):
     chars = string.ascii_letters + string.digits
     return "Kaze-" + ''.join(random.choice(chars) for _ in range(length))
 
@@ -158,6 +158,8 @@ async def inline_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📅 Expires (PH):\n"
             f"{expire.strftime('%B %d, %Y • %I:%M %p')}\n\n"
             "🟢 Status: ACTIVE",
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🔥 Auto notify when key expires",
             parse_mode="Markdown"
         )
 
