@@ -174,11 +174,13 @@ async def access(update: Update, context: ContextTypes.DEFAULT_TYPE):
     key = context.args[0]
     expire = access_keys.get(key)
 
-    if not expire or expire < now:
+    if not expire or (expire and expire < now):
         await update.message.reply_text("❌ Invalid or expired access key")
         return
 
     user_access[user_id] = expire
+    user_access_key[user_id] = key   # ✅ IMPORTANT LINE
+
     await update.message.reply_text("✅ Access granted! Use /start")
 
 # ===== /GENKEY =====
@@ -299,7 +301,7 @@ async def revoke(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     else:
         await update.message.reply_text(
-            "⚠️ Key revoked but no active users found",
+            "✅Key revoked",
             parse_mode="Markdown"
         )
         
