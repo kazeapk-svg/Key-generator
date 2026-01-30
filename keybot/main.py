@@ -69,14 +69,22 @@ def duration_from_code(code):
 # ===== AUTO EXPIRE RANDOM KEY =====
 async def expire_random_key(duration, key, chat_id, app):
     await asyncio.sleep(duration.total_seconds())
+
     if key in random_keys:
         del random_keys[key]
         await app.bot.send_message(
-            chat_id,
-            f"❌ 𝗞𝗘𝗬 𝗘𝗫𝗣𝗜𝗥𝗘𝗗\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"🔑 `{key}`\n"
-            f"🔴 Status: EXPIRED",
+            chat_id=chat_id,
+            text=(
+                "❌ 𝗞𝗘𝗬 𝗘𝗫𝗣𝗜𝗥𝗘𝗗\n"
+                "━━━━━━━━━━━━━━━━━━━\n"
+                f"📝 Key: `{key}`\n"
+                "🔑 Your key is no longer valid\n\n"
+                "📌 Status:\n"
+                "🔴 EXPIRED\n\n"
+                "⚠️ Please generate a new key\n"
+                "🔥 Click /genkey to generate\n"
+                "━━━━━━━━━━━━━━━━━━━"
+            ),
             parse_mode="Markdown"
         )
 
@@ -90,7 +98,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🔑 Generate Random Key", callback_data="gen_random")]
         ])
         await update.message.reply_text(
-            "✅ ACCESS GRANTED\n\nChoose an option:",
+            "\n\nChoose an option:",
             reply_markup=keyboard
         )
     else:
@@ -143,14 +151,18 @@ async def inline_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         expire = datetime.now(PH_TZ) + duration
         random_keys[key] = expire
 
-        await query.message.reply_text(
-            "✨ 𝗞𝗘𝗬 𝗚𝗘𝗡𝗘𝗥𝗔𝗧𝗘𝗗\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            f"🔑 `{key}`\n\n"
-            f"📅 Expires (PH):\n"
-            f"{expire.strftime('%B %d, %Y • %I:%M %p')}\n\n"
-            "🟢 Status: ACTIVE",
-            parse_mode="Markdown"
+        await update.message.reply_text(
+        "✨ 𝗞𝗘𝗬 𝗚𝗘𝗡𝗘𝗥𝗔𝗧𝗘𝗗\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "💎 𝗞𝗘𝗬 𝗜𝗡𝗙𝗢𝗥𝗠𝗔𝗧𝗜𝗢𝗡\n\n"
+        f"🔑 𝗞𝗲𝘆:\n`{key}` (tap to copy)\n\n"
+        "📅 𝗘𝘅𝗽𝗶𝗿𝗲𝘀 (PH):\n"
+        f"{expire_time.strftime('%B %d, %Y • %I:%M %p')}\n\n"
+        "📌 𝗦𝘁𝗮𝘁𝘂𝘀:\n"
+        "🟢 ACTIVE\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "🔥 Auto notify when key expires",
+        parse_mode="Markdown"
         )
 
         asyncio.create_task(
@@ -174,14 +186,43 @@ async def access(update: Update, context: ContextTypes.DEFAULT_TYPE):
     key = context.args[0]
     expire = access_keys.get(key)
 
-    if not expire or (expire and expire < now):
-        await update.message.reply_text("❌ Invalid or expired access key")
+    if not expire and expire is not None:
+        await update.message.reply_text("❌ Invalid access key")
         return
 
-    user_access[user_id] = expire
-    user_access_key[user_id] = key   # ✅ IMPORTANT LINE
+    if expire and expire < now:
+        await update.message.reply_text("❌ Expired access key")
+        return
 
-    await update.message.reply_text("✅ Access granted! Use /start")
+    # ✅ SAVE USER ACCESS
+    user_access[user_id] = expire
+    user_access_key[user_id] = key
+
+    expire_text = (
+        expire.strftime('%B %d, %Y • %I:%M %p')
+        if expire else "♾ LIFETIME"
+    )
+
+    await update.message.reply_text(
+        "✅ 𝗣𝗥𝗘𝗠𝗜𝗨𝗠 𝗔𝗖𝗖𝗘𝗦𝗦 𝗔𝗖𝗧𝗜𝗩𝗔𝗧𝗘𝗗!\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "💎 𝗞𝗘𝗬 𝗜𝗡𝗙𝗢𝗥𝗠𝗔𝗧𝗜𝗢𝗡\n"
+        f"🔑 Key: `{key}`\n"
+        f"📅 Expires: {expire_text}\n"
+        "📌 Status: 🟢 ACTIVE\n\n"
+        "🚀 𝗣𝗥𝗘𝗠𝗜𝗨𝗠 𝗙𝗘𝗔𝗧𝗨𝗥𝗘𝗦 𝗨𝗡𝗟𝗢𝗖𝗞𝗘𝗗\n"
+        "• ⚡ Faster & smoother\n"
+        "• 🎯 Auto notify if key expired\n"
+        "• ♾ Unlimited usage\n\n"
+        "📘 𝗔𝗩𝗔𝗜𝗟𝗔𝗕𝗟𝗘 𝗖𝗢𝗠𝗠𝗔𝗡𝗗𝗦\n"
+        "• /start – Open the main menu\n"
+        "• /genkey – Generate random key\n\n"
+        "🧪 Example:\n"
+        "`/genkey 1m`\n"
+        "`/genkey 1h`\n"
+        "`/genkey 1d`",
+        parse_mode="Markdown"
+    )
 
 # ===== /GENKEY =====
 async def genkey(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -237,7 +278,7 @@ async def genkey(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
         return
-
+        
     # ===== USER: RANDOM KEY =====
     if user_id not in user_access or user_access[user_id] < now:
         await update.message.reply_text("❌ You need access first. Use /start")
@@ -253,11 +294,16 @@ async def genkey(update: Update, context: ContextTypes.DEFAULT_TYPE):
     random_keys[key] = expire
 
     await update.message.reply_text(
-        "✨ RANDOM KEY GENERATED\n"
+        "✨ 𝗞𝗘𝗬 𝗚𝗘𝗡𝗘𝗥𝗔𝗧𝗘𝗗\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
-        f"🔑 `{key}`\n"
-        f"📅 Expires:\n"
-        f"{expire.strftime('%B %d, %Y • %I:%M %p')}",
+        "💎 𝗞𝗘𝗬 𝗜𝗡𝗙𝗢𝗥𝗠𝗔𝗧𝗜𝗢𝗡\n\n"
+        f"🔑 𝗞𝗲𝘆:\n`{key}` (tap to copy)\n\n"
+        "📅 𝗘𝘅𝗽𝗶𝗿𝗲𝘀 (PH):\n"
+        f"{expire_time.strftime('%B %d, %Y • %I:%M %p')}\n\n"
+        "📌 𝗦𝘁𝗮𝘁𝘂𝘀:\n"
+        "🟢 ACTIVE\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "🔥 Auto notify when key expires",
         parse_mode="Markdown"
     )
 
