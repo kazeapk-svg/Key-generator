@@ -45,7 +45,7 @@ user_access_key = {}    # user_id -> access_key
 random_keys = {}        # random_key -> expire
 
 # ===== UTILS =====
-def generate_key(length=7):
+def generate_key(length=8):
     chars = string.ascii_letters + string.digits
     return "Kaze-" + ''.join(random.choice(chars) for _ in range(length))
 
