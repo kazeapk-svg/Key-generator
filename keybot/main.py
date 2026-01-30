@@ -197,9 +197,9 @@ async def genkey(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ===== ACCESS KEY (OWNER ONLY) =====
     if context.args[0].lower() == "access":
     if user_id != OWNER_ID:
-        await update.message.reply_text("❌ Owner only panel")
-        return
-
+    await update.message.reply_text("❌ Owner only panel")
+    return
+    
     if len(context.args) < 2:
         await update.message.reply_text(
             "❌ Missing duration\n\n"
