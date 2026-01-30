@@ -1,6 +1,7 @@
 import os
 import random
 import string
+import asyncio
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from telegram import Update
@@ -10,7 +11,6 @@ from flask import Flask
 
 # ===== KEEP ALIVE (OPTIONAL) =====
 app_web = Flask(__name__)
-OWNER_ID = int(os.getenv("OWNER_ID", "0"))
 
 @app_web.route("/")
 def home():
@@ -27,7 +27,7 @@ def keep_alive():
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 PH_TZ = ZoneInfo("Asia/Manila")
 
-# ===== IN-MEMORY KEY STORAGE =====
+# ===== IN-MEMORY STORAGE =====
 keys_db = {}
 
 # ===== KEY GENERATOR =====
@@ -52,6 +52,17 @@ def parse_duration(text: str):
         pass
     return None
 
+# ===== AUTO EXPIRATION TASK =====
+async def expire_key_after(duration, key, chat_id, app):
+    await asyncio.sleep(duration.total_seconds())
+
+    if key in keys_db:
+        del keys_db[key]
+        await app.bot.send_message(
+            chat_id=chat_id,
+            text="❌ Key expired you need to genkey again"
+        )
+
 # ===== /genkey =====
 async def genkey(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
@@ -74,7 +85,17 @@ async def genkey(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"⏰ Expires (PH): {expire_time.strftime('%Y-%m-%d %I:%M %p')}"
     )
 
-# ===== /checkkey =====
+    # 🔥 AUTO EXPIRE TASK
+    asyncio.create_task(
+        expire_key_after(
+            duration,
+            key,
+            update.effective_chat.id,
+            context.application
+        )
+    )
+
+# ===== /checkkey (OPTIONAL BUT OKAY NA) =====
 async def checkkey(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("Usage: /checkkey YOUR_KEY")
@@ -84,7 +105,7 @@ async def checkkey(update: Update, context: ContextTypes.DEFAULT_TYPE):
     expire_time = keys_db.get(key)
 
     if not expire_time:
-        await update.message.reply_text("❌ Invalid key")
+        await update.message.reply_text("❌ Invalid or expired key")
         return
 
     if datetime.now(PH_TZ) > expire_time:
@@ -103,7 +124,7 @@ def main():
     app.add_handler(CommandHandler("genkey", genkey))
     app.add_handler(CommandHandler("checkkey", checkkey))
 
-    print("🤖 Bot is running using polling...")
+    print("🤖 Bot running with polling...")
     app.run_polling()
 
 if __name__ == "__main__":
