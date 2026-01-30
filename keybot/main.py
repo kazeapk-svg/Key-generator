@@ -41,12 +41,11 @@ def parse_duration(text: str):
     try:
         value = int(text[:-1])
         unit = text[-1].lower()
-
         if unit == "m":
             return timedelta(minutes=value)
-        elif unit == "h":
+        if unit == "h":
             return timedelta(hours=value)
-        elif unit == "d":
+        if unit == "d":
             return timedelta(days=value)
     except:
         pass
@@ -60,7 +59,18 @@ async def expire_key_after(duration, key, chat_id, app):
         del keys_db[key]
         await app.bot.send_message(
             chat_id=chat_id,
-            text="❌ Key expired you need to genkey again"
+            text=(
+                "❌ 𝗞𝗘𝗬 𝗘𝗫𝗣𝗜𝗥𝗘𝗗\n"
+                "━━━━━━━━━━━━━━━━━━━\n"
+                f"📝 Key: `{key}`\n"
+                "🔑 Your key is no longer valid\n\n"
+                "📌 Status:\n"
+                "🔴 EXPIRED\n\n"
+                "⚠️ Please generate a new key\n"
+                "🔥 Click /genkey to generate\n"
+                "━━━━━━━━━━━━━━━━━━━"
+            ),
+            parse_mode="Markdown"
         )
 
 # ===== /genkey =====
@@ -81,11 +91,19 @@ async def genkey(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keys_db[key] = expire_time
 
     await update.message.reply_text(
-        f"🔑 Generated Key:\n{key}\n\n"
-        f"⏰ Expires (PH): {expire_time.strftime('%Y-%m-%d %I:%M %p')}"
+        "✨ 𝗞𝗘𝗬 𝗚𝗘𝗡𝗘𝗥𝗔𝗧𝗘𝗗\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "💎 𝗞𝗘𝗬 𝗜𝗡𝗙𝗢𝗥𝗠𝗔𝗧𝗜𝗢𝗡\n\n"
+        f"🔑 𝗞𝗲𝘆:\n`{key}` (tap to copy)\n\n"
+        "📅 𝗘𝘅𝗽𝗶𝗿𝗲𝘀 (PH):\n"
+        f"{expire_time.strftime('%B %d, %Y • %I:%M %p')}\n\n"
+        "📌 𝗦𝘁𝗮𝘁𝘂𝘀:\n"
+        "🟢 ACTIVE\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "🔥 Auto notify when key expires",
+        parse_mode="Markdown"
     )
 
-    # 🔥 AUTO EXPIRE TASK
     asyncio.create_task(
         expire_key_after(
             duration,
@@ -95,7 +113,7 @@ async def genkey(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     )
 
-# ===== /checkkey (OPTIONAL BUT OKAY NA) =====
+# ===== /checkkey =====
 async def checkkey(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("Usage: /checkkey YOUR_KEY")
@@ -120,10 +138,8 @@ async def checkkey(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ===== MAIN =====
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-
     app.add_handler(CommandHandler("genkey", genkey))
     app.add_handler(CommandHandler("checkkey", checkkey))
-
     print("🤖 Bot running with polling...")
     app.run_polling()
 
