@@ -155,9 +155,9 @@ async def inline_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
           "✨ 𝗞𝗘𝗬 𝗚𝗘𝗡𝗘𝗥𝗔𝗧𝗘𝗗\n"
           "━━━━━━━━━━━━━━━━━━━━\n"
           f"🔑 `{key}`\n\n"
-          f"📅 Expires (PH):\n"
+          "📅 Expires (PH):\n"
           f"{expire.strftime('%B %d, %Y • %I:%M %p')}\n\n"
-          "🟢 Status: ACTIVE",
+          "🟢 Status: ACTIVE\n"
           "━━━━━━━━━━━━━━━━━━━━\n"
           "🔥 Auto notify when key expires",
           parse_mode="Markdown"
