@@ -39,9 +39,10 @@ OWNER_ID = int(os.environ.get("OWNER_ID", "0"))
 PH_TZ = ZoneInfo("Asia/Manila")
 
 # ===== DATABASES (IN-MEMORY) =====
-access_keys = {}      # access_key -> expire
-user_access = {}      # user_id -> expire
-random_keys = {}      # key -> expire
+access_keys = {}        # access_key -> expire
+user_access = {}        # user_id -> expire
+user_access_key = {}    # user_id -> access_key
+random_keys = {}        # random_key -> expire
 
 # ===== UTILS =====
 def generate_key(length=10):
@@ -49,14 +50,22 @@ def generate_key(length=10):
     return "Kaze-" + ''.join(random.choice(chars) for _ in range(length))
 
 def duration_from_code(code):
+    code = code.lower()
+
     if code == "1m":
         return timedelta(minutes=1)
     if code == "1h":
         return timedelta(hours=1)
     if code == "1d":
         return timedelta(days=1)
+    if code == "3d":
+        return timedelta(days=3)
+    if code == "7d":
+        return timedelta(days=7)
+    if code == "lifetime":
+        return None  # special case
     return None
-
+    
 # ===== AUTO EXPIRE RANDOM KEY =====
 async def expire_random_key(duration, key, chat_id, app):
     await asyncio.sleep(duration.total_seconds())
@@ -180,31 +189,54 @@ async def genkey(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "Usage:\n"
             "/genkey 1m | 1h | 1d\n"
-            "/genkey access 1d (owner only)"
+            "/genkey 3d | 7d | Lifetime"
+            "🔥Auto notify if key expired🔥"
         )
         return
 
     # ===== ACCESS KEY (OWNER ONLY) =====
     if context.args[0].lower() == "access":
-        if user_id != OWNER_ID:
-            await update.message.reply_text("❌ Owner only panel")
-            return
+    if user_id != OWNER_ID:
+        await update.message.reply_text("❌ Owner only panel")
+        return
 
-        duration = duration_from_code(context.args[1])
-        key = generate_key()
-        expire = datetime.now(PH_TZ) + duration
-        access_keys[key] = expire
-
+    if len(context.args) < 2:
         await update.message.reply_text(
-            "🔐 ACCESS KEY GENERATED\n"
-            "━━━━━━━━━━━━━━━━━━━\n"
-            f"🔑 `{key}`\n"
-            f"📅 Expires (PH):\n"
-            f"{expire.strftime('%B %d, %Y • %I:%M %p')}",
-            parse_mode="Markdown"
+            "❌ Missing duration\n\n"
+            "Example:\n"
+            "/genkey access 1d\n"
+            "/genkey access 3d\n"
+            "/genkey access 7d\n"
+            "/genkey access lifetime"
         )
         return
 
+    duration = duration_from_code(context.args[1])
+
+    if duration is None and context.args[1].lower() != "lifetime":
+        await update.message.reply_text("❌ Invalid duration")
+        return
+
+    key = generate_key()
+    now = datetime.now(PH_TZ)
+
+    if duration:
+        expire = now + duration
+    else:
+        expire = None  # ♾ lifetime
+
+    access_keys[key] = expire
+
+    await update.message.reply_text(
+        "🔐 ACCESS KEY GENERATED\n"
+        "━━━━━━━━━━━━━━━━━━━\n"
+        f"🔑 `{key}`\n"
+        f"📅 Expires (PH):\n"
+        f"{expire.strftime('%B %d, %Y • %I:%M %p') if expire else '♾ LIFETIME'}",
+        parse_mode="Markdown"
+    )
+    return
+    
     # ===== RANDOM KEY (USERS) =====
     if user_id not in user_access or user_access[user_id] < datetime.now(PH_TZ):
         await update.message.reply_text("❌ You need access first. Use /start")
@@ -238,13 +270,37 @@ async def revoke(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID:
         return
 
+    if not context.args:
+        await update.message.reply_text("Usage: /revoke ACCESS_KEY")
+        return
+
     key = context.args[0]
+    removed_users = []
+
+    # remove access key
     if key in access_keys:
         del access_keys[key]
-        await update.message.reply_text("✅ Access key revoked")
-    else:
-        await update.message.reply_text("❌ Key not found")
 
+    # remove users who used this key
+    for user_id, used_key in list(user_access_key.items()):
+        if used_key == key:
+            user_access.pop(user_id, None)
+            user_access_key.pop(user_id, None)
+            removed_users.append(user_id)
+
+    if removed_users:
+        await update.message.reply_text(
+            f"✅ Access revoked\n"
+            f"🔑 Key: `{key}`\n"
+            f"👥 Users removed: {len(removed_users)}",
+            parse_mode="Markdown"
+        )
+    else:
+        await update.message.reply_text(
+            "⚠️ Key revoked but no active users found",
+            parse_mode="Markdown"
+        )
+        
 # ===== MAIN =====
 def main():
     keep_alive()
